@@ -1,8 +1,8 @@
 module GpWebpay
   class Payment
 
-    DIGEST_ALLOWED_ATTRIBUTES = %w(OPERATION ORDERNUMBER MERORDERNUM PRCODE
-                                   SRCODE RESULTTEXT)
+    DIGEST_ALLOWED_ATTRIBUTES = %w(OPERATION ORDERNUMBER MERORDERNUM MD PRCODE
+                                   SRCODE RESULTTEXT USERPARAM1 ADDINFO)
 
     DEFAULT_VALUES = {
       deposit_flag: 1
@@ -21,6 +21,7 @@ module GpWebpay
                 :merchant_description, :description, :paymethod,
                 :disable_paymethod, :paymethods, :email, :reference_number,
                 :cart_info
+
     attr_accessor :redirect_url
 
     def merchant_number
