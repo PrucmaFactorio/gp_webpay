@@ -1,3 +1,5 @@
+require 'savon'
+
 module GpWebpay
   class Payment
 
@@ -42,6 +44,12 @@ module GpWebpay
     def success?(params)
       verified_response?(params) &&
         params['PRCODE'] == '0' && params['SRCODE'] == '0'
+    end
+
+    def testWsdl
+      client = Savon::client(wsdl: File.expand_path('wsdl/cws_v1.wsdl'), endpoint:'https://test.3dsecure.gpwebpay.com/pay-ws/v1/PaymentService')
+      respons = client.call(:echo, {})
+      puts 'respons', respons
     end
 
     private
