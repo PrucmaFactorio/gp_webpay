@@ -19,12 +19,10 @@ module GpWebpay
     include ActiveSupport::Configurable
     config_accessor :merchant_number
     config_accessor :merchant_pem
-    config_accessor :merchant_pem_path
     config_accessor :merchant_password
     config_accessor :gpe_pem_path
     config_accessor :environment
     config_accessor :provider
-    config_accessor :gp_webpay_bank
 
     def param_name
       config.param_name.respond_to?(:call) ? config.param_name.call : config.param_name
@@ -40,22 +38,19 @@ module GpWebpay
         end
       when :gp_webpay
         if production?
-          "https://3dsecure.gpwebpay.com/#{config.gp_webpay_bank}/order.do"
+          "https://3dsecure.gpwebpay.com/pgw/order.do"
         else
-          "https://test.3dsecure.gpwebpay.com/#{config.gp_webpay_bank}/order.do"
+          "https://test.3dsecure.gpwebpay.com/pgw/order.do"
         end
       end
     end
 
-    def gpe_pem_path
-      env = production? ? 'prod' : 'test'
-
-      file_name = case config.provider
-                  when :csob      then "mips_#{env}.csob.cz.pem"
-                  when :gp_webpay then "muzo.signing_#{env}.pem"
-                  end
-
-      File.expand_path("../../../certs/#{file_name}", __FILE__)
+    def gpe_pem
+      if config.gpe_pem_path
+        File.read config.gpe_pem_path
+      else
+        nil
+      end
     end
 
     def production?
@@ -72,10 +67,9 @@ module GpWebpay
   configure do |config|
     config.merchant_number    = nil
     config.merchant_pem       = nil
-    config.merchant_pem_path  = nil
     config.merchant_password  = nil
+    config.gpe_pem_path       = nil
     config.environment        = defined?(Rails) && Rails.env || 'test'
     config.provider           = :gp_webpay
-    config.gp_webpay_bank     = :kb
   end
 end
