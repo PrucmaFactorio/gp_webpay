@@ -25,6 +25,26 @@ module GpWebpay
                 :cart_info
 
     attr_accessor :redirect_url
+    
+    def self.doTestPayment
+      payment = GpWebpay::Payment.new({
+        order_number: rand(0..9999999999),
+        amount_in_cents: 100,
+        currency: 203,
+        deposit_flag: 0,
+        merchant_description: 'Je to husty',
+        redirect_url: 'http://localhost/order.do',
+        description: 'Neco zajimaveho'
+      })
+      GpWebpay.configure do |config|
+        config.merchant_number    = 8888880050
+        config.merchant_password  = 'Knedlik123'
+        config.merchant_pem       = File.read File.expand_path('certs/gpwebpay-pvk.key')
+        config.gpe_pem_path       = File.expand_path('certs/gpe.signing_test.pem')
+      end
+
+      payment
+    end
 
     def merchant_number
       config.merchant_number
@@ -47,9 +67,51 @@ module GpWebpay
     end
 
     def testWsdl
-      client = Savon::client(wsdl: File.expand_path('wsdl/cws_v1.wsdl'), endpoint:'https://test.3dsecure.gpwebpay.com/pay-ws/v1/PaymentService')
-      respons = client.call(:echo, {})
-      puts 'respons', respons
+      client = Savon::client(
+        wsdl: File.expand_path('wsdl/cws_v1.wsdl'),
+        endpoint:'https://test.3dsecure.gpwebpay.com/pay-ws/v1/PaymentService',
+        convert_request_keys_to: :lower_camelcase,
+        pretty_print_xml: true,
+        log: :true,
+        log_level: :debug,
+        logger: Logger.new(STDOUT),
+        env_namespace: :soapenv
+      )
+      message = { 
+        payment_link_request: {
+          'ins0:messageId' =>  rand(0..9999999999999999999).to_i,
+          'ins0:provider' => '0880',
+          'ins0:merchantNumber' => '8888880050',
+          'ins0:paymentNumber': rand(0..9999999999),
+          'ins0:amount' => 1000,
+          'ins0:currencyCode' => 203,
+          'ins0:captureFlag' => 0,
+          'ins0:email' => 'martin.prucha@factorio.cz',
+          'ins0:paymentExpiry' => '2018-04-27'
+        }
+      }
+
+      sign = merchant_key.sign(OpenSSL::Digest::SHA1.new, message.values.join('|'))
+      digest = Base64.encode64(sign).gsub("\n", '')
+      message[:payment_link_request]['ins0:signature'] = digest
+      response = client.call(:create_payment_link, { message: message })
+      puts 'response', response
+    end
+
+    def test
+      attributes = {
+        'MERCHANTNUMBER' => GpWebpay.config.merchant_number.to_s,
+        'OPERATION' => operation + 'a',
+        'ORDERNUMBER' => '2',
+        'AMOUNT' => '100',
+        'CURRENCY' => '203',
+        'DEPOSITFLAG' => '0',
+        'URL' => 'http://localhost/test',
+      }
+      sign = merchant_key.sign(OpenSSL::Digest::SHA1.new, attributes.values.join('|'))
+      digest = Base64.encode64(sign).gsub("\n", '')
+      attributes = attributes.merge('DIGEST' => digest)
+      "#{config.pay_url}?#{URI.encode_www_form(attributes)}"
     end
 
     private
@@ -90,7 +152,7 @@ module GpWebpay
     end
 
     def verify_digest(signature, data)
-      gpe_key.verify(OpenSSL::Digest::SHA1.new, Base64.decode64(signature), data)
+      gpe_key.  (OpenSSL::Digest::SHA1.new, Base64.decode64(signature), data)
     end
 
     def merchant_key
