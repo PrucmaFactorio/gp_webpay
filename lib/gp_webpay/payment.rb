@@ -1,17 +1,28 @@
 module GpWebpay
-  module Payment
-    extend ActiveSupport::Concern
+  class Payment
 
-    DIGEST_ALLOWED_ATTRIBUTES = %w(OPERATION ORDERNUMBER MERORDERNUM PRCODE
-                                   SRCODE RESULTTEXT)
+    DIGEST_ALLOWED_ATTRIBUTES = %w(OPERATION ORDERNUMBER MERORDERNUM MD PRCODE
+                                   SRCODE RESULTTEXT USERPARAM1 ADDINFO)
 
-    included do
-      attr_accessor :redirect_url
+    DEFAULT_VALUES = {
+      deposit_flag: 1
+    }
+
+    def initialize(atributes = {})
+      atributes.each do |key, value|
+        instance_variable_set(:"@#{key}", value) if self.respond_to?(key)
+      end
+      DEFAULT_VALUES.each do |key, value|
+        instance_variable_set(:"@#{key}", value) if !self.public_send(key)
+      end
     end
 
-    def deposit_flag
-      1
-    end
+    attr_reader :order_number, :amount_in_cents, :currency, :deposit_flag,
+                :merchant_description, :description, :paymethod,
+                :disable_paymethod, :paymethods, :email, :reference_number,
+                :cart_info
+
+    attr_accessor :redirect_url
 
     def merchant_number
       config.merchant_number
@@ -23,8 +34,9 @@ module GpWebpay
 
     def pay_url(options = {})
       self.redirect_url = options[:redirect_url]
-
-      "#{config.pay_url}?#{payment_attributes_with_digest.to_param}"
+      attributes_with_digest = payment_attributes_with_digest
+      attributes_with_digest['LANG'] = options[:lang] if options.has_key?(:lang)
+      "#{config.pay_url}?#{URI.encode_www_form(attributes_with_digest)}"
     end
 
     def success?(params)
@@ -75,14 +87,14 @@ module GpWebpay
 
     def merchant_key
       @merchant_key ||= begin
-        pem = config.merchant_pem || File.read(config.merchant_pem_path)
+        pem = config.merchant_pem
         OpenSSL::PKey::RSA.new(pem, config.merchant_password)
       end
     end
 
     def gpe_key
       @gpe_key ||= begin
-        pem = File.read config.gpe_pem_path
+        pem = config.gpe_pem
         OpenSSL::X509::Certificate.new(pem).public_key
       end
     end
